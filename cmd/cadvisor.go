@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"sort"
 	"strings"
 	"syscall"
 	"time"
@@ -97,14 +98,17 @@ var (
 	// List of metrics that can be ignored.
 	ignoreWhitelist = container.MetricSet{
 		container.AcceleratorUsageMetrics:        struct{}{},
+		container.CpuLoadMetrics:                 struct{}{},
 		container.DiskUsageMetrics:               struct{}{},
 		container.DiskIOMetrics:                  struct{}{},
 		container.MemoryNumaMetrics:              struct{}{},
+		container.MemoryUsageMetrics:             struct{}{},
 		container.NetworkUsageMetrics:            struct{}{},
 		container.NetworkTcpUsageMetrics:         struct{}{},
 		container.NetworkAdvancedTcpUsageMetrics: struct{}{},
 		container.NetworkUdpUsageMetrics:         struct{}{},
 		container.PerCpuUsageMetrics:             struct{}{},
+		container.PerfMetrics:                    struct{}{},
 		container.ProcessSchedulerMetrics:        struct{}{},
 		container.ProcessMetrics:                 struct{}{},
 		container.HugetlbUsageMetrics:            struct{}{},
@@ -121,10 +125,11 @@ type metricSetValue struct {
 }
 
 func (ml *metricSetValue) String() string {
-	var values []string
+	values := make([]string, 0, len(ml.MetricSet))
 	for metric := range ml.MetricSet {
 		values = append(values, string(metric))
 	}
+	sort.Strings(values)
 	return strings.Join(values, ",")
 }
 
@@ -144,7 +149,12 @@ func (ml *metricSetValue) Set(value string) error {
 }
 
 func init() {
-	flag.Var(&ignoreMetrics, "disable_metrics", "comma-separated list of `metrics` to be disabled. Options are 'accelerator', 'cpu_topology','disk', 'diskIO', 'memory_numa', 'network', 'tcp', 'udp', 'percpu', 'sched', 'process', 'hugetlb', 'referenced_memory', 'resctrl', 'cpuset'.")
+	opts := make([]string, 0, len(ignoreWhitelist))
+	for key := range ignoreWhitelist {
+		opts = append(opts, string(key))
+	}
+	sort.Strings(opts)
+	flag.Var(&ignoreMetrics, "disable_metrics", fmt.Sprintf("comma-separated list of `metrics` to be disabled. Options are '%s'.", strings.Join(opts, "', '")))
 
 	// Default logging verbosity to V(2)
 	flag.Set("v", "2")
